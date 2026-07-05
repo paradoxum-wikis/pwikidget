@@ -205,25 +205,24 @@ func (c *FandomClient) GetProfile(sub string, userID int64) (UserProfile, error)
 	}, nil
 }
 
-func (c *FandomClient) ResolveOnWikis(username string, userID int64) (aeID, tdsID int64, err error) {
+func (c *FandomClient) ResolveUser(username string, userID int64) (int64, error) {
 	if userID != 0 {
 		if _, err := c.GetProfile(wikiAE, userID); err != nil {
-			return 0, 0, fmt.Errorf("alter-ego: %w", err)
+			return 0, fmt.Errorf("alter-ego: %w", err)
 		}
 		if _, err := c.GetProfile(wikiTDS, userID); err != nil {
-			return 0, 0, fmt.Errorf("tds: %w", err)
+			return 0, fmt.Errorf("tds: %w", err)
 		}
-		return userID, userID, nil
+		return userID, nil
 	}
-	aeID, err = c.LookupUserID(wikiAE, username)
+	id, err := c.LookupUserID(wikiAE, username)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
-	tdsID, err = c.LookupUserID(wikiTDS, username)
-	if err != nil {
-		return 0, 0, err
+	if _, err := c.GetProfile(wikiTDS, id); err != nil {
+		return 0, fmt.Errorf("tds: %w", err)
 	}
-	return aeID, tdsID, nil
+	return id, nil
 }
 
 func urlPathEscape(s string) string {

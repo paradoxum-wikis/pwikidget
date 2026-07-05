@@ -33,10 +33,10 @@ func Run(configPath string) error {
 	}
 
 	bot := &Bot{
-		appID:  appID,
-		token:  cfg.DiscordToken,
-		store:  store,
-		fandom: fandom,
+		appID:   appID,
+		token:   cfg.DiscordToken,
+		store:   store,
+		fandom:  fandom,
 		aphonos: newAphonosClient(),
 	}
 

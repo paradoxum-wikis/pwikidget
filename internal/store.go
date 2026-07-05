@@ -10,8 +10,7 @@ import (
 type UserLink struct {
 	DiscordID string `json:"discord_id"`
 	Username  string `json:"username"`
-	AEUserID  int64  `json:"ae_user_id"`
-	TDSUserID int64  `json:"tds_user_id"`
+	UserID    int64  `json:"user_id"`
 }
 
 type Store struct {
@@ -29,7 +28,10 @@ func openStore(path string) (*Store, error) {
 		}
 		return nil, err
 	}
-	return s, json.Unmarshal(b, &s.links)
+	if err := json.Unmarshal(b, &s.links); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (s *Store) Save(u UserLink) error {

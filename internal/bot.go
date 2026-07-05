@@ -214,7 +214,7 @@ func (b *Bot) handleVerify(s *discordgo.Session, i *discordgo.InteractionCreate)
 }
 
 func (b *Bot) finishSetup(s *discordgo.Session, i *discordgo.InteractionCreate, uid, username string, userID int64) {
-	aeID, tdsID, err := b.fandom.ResolveOnWikis(username, userID)
+	userID, err := b.fandom.ResolveUser(username, userID)
 	if err != nil {
 		followup(s, i, err.Error())
 		return
@@ -223,8 +223,7 @@ func (b *Bot) finishSetup(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	link := UserLink{
 		DiscordID: uid,
 		Username:  username,
-		AEUserID:  aeID,
-		TDSUserID: tdsID,
+		UserID:    userID,
 	}
 	if err := b.store.Save(link); err != nil {
 		followup(s, i, "Failed to save link.")

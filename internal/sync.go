@@ -57,11 +57,11 @@ func (b *Bot) syncUser(link UserLink) error {
 	if err != nil {
 		return err
 	}
-	aeProfile, err := b.fandom.GetProfile(wikiAE, link.AEUserID)
+	aeProfile, err := b.fandom.GetProfile(wikiAE, link.UserID)
 	if err != nil {
 		return err
 	}
-	tdsProfile, err := b.fandom.GetProfile(wikiTDS, link.TDSUserID)
+	tdsProfile, err := b.fandom.GetProfile(wikiTDS, link.UserID)
 	if err != nil {
 		return err
 	}
