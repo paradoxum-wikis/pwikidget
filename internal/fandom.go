@@ -24,7 +24,6 @@ func newFandomClient(ua string) *FandomClient {
 }
 
 type UserProfile struct {
-	ID           int64
 	Username     string
 	DisplayName  string
 	Avatar       string
@@ -193,7 +192,6 @@ func (c *FandomClient) GetProfile(sub string, userID int64) (UserProfile, error)
 	}
 	reg, _ := out.UserData.Registration.(string)
 	return UserProfile{
-		ID:           out.UserData.ID,
 		Username:     out.UserData.Username,
 		DisplayName:  out.UserData.Name,
 		Avatar:       out.UserData.Avatar,
@@ -205,24 +203,14 @@ func (c *FandomClient) GetProfile(sub string, userID int64) (UserProfile, error)
 	}, nil
 }
 
-func (c *FandomClient) ResolveUser(username string, userID int64) (int64, error) {
-	if userID != 0 {
-		if _, err := c.GetProfile(wikiAE, userID); err != nil {
-			return 0, fmt.Errorf("alter-ego: %w", err)
-		}
-		if _, err := c.GetProfile(wikiTDS, userID); err != nil {
-			return 0, fmt.Errorf("tds: %w", err)
-		}
-		return userID, nil
+func (c *FandomClient) ValidateUser(userID int64) error {
+	if _, err := c.GetProfile(wikiAE, userID); err != nil {
+		return fmt.Errorf("alter-ego: %w", err)
 	}
-	id, err := c.LookupUserID(wikiAE, username)
-	if err != nil {
-		return 0, err
+	if _, err := c.GetProfile(wikiTDS, userID); err != nil {
+		return fmt.Errorf("tds: %w", err)
 	}
-	if _, err := c.GetProfile(wikiTDS, id); err != nil {
-		return 0, fmt.Errorf("tds: %w", err)
-	}
-	return id, nil
+	return nil
 }
 
 func urlPathEscape(s string) string {

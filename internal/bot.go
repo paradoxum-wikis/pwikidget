@@ -136,17 +136,16 @@ func (b *Bot) handleSetupContinue(s *discordgo.Session, i *discordgo.Interaction
 		return
 	}
 	if link != nil {
-		b.finishSetup(s, i, uid, link.FandomUsername, link.FandomUserID)
+		if err := b.fandom.ValidateUser(link.FandomUserID); err != nil {
+			followup(s, i, err.Error())
+			return
+		}
+		b.linkAndSync(s, i, uid, link.FandomUsername, link.FandomUserID)
 		return
 	}
 
 	if username == "" {
 		followup(s, i, "Not linked via Aphonos. Run `/widget setup username:YourName`.")
-		return
-	}
-
-	if _, err := b.fandom.LookupUserID(wikiAE, username); err != nil {
-		followup(s, i, err.Error())
 		return
 	}
 
@@ -210,27 +209,25 @@ func (b *Bot) handleVerify(s *discordgo.Session, i *discordgo.InteractionCreate)
 		return
 	}
 
-	b.finishSetup(s, i, uid, username, aeID)
-}
-
-func (b *Bot) finishSetup(s *discordgo.Session, i *discordgo.InteractionCreate, uid, username string, userID int64) {
-	userID, err := b.fandom.ResolveUser(username, userID)
-	if err != nil {
-		followup(s, i, err.Error())
+	if _, err := b.fandom.GetProfile(wikiTDS, aeID); err != nil {
+		followup(s, i, fmt.Errorf("tds: %w", err).Error())
 		return
 	}
 
+	b.linkAndSync(s, i, uid, username, aeID)
+}
+
+func (b *Bot) linkAndSync(s *discordgo.Session, i *discordgo.InteractionCreate, uid, username string, userID int64) {
 	link := UserLink{
-		DiscordID: uid,
-		Username:  username,
-		UserID:    userID,
+		Username: username,
+		UserID:   userID,
 	}
-	if err := b.store.Save(link); err != nil {
+	if err := b.store.Save(uid, link); err != nil {
 		followup(s, i, "Failed to save link.")
 		return
 	}
 
-	if err := b.syncUser(link); err != nil {
+	if err := b.syncUser(uid, link); err != nil {
 		b.followupSyncError(s, i, "Linked, but widget sync failed: ", err)
 		return
 	}
@@ -252,7 +249,7 @@ func (b *Bot) handleRefresh(s *discordgo.Session, i *discordgo.InteractionCreate
 		return
 	}
 
-	if err := b.syncUser(link); err != nil {
+	if err := b.syncUser(uid, link); err != nil {
 		b.followupSyncError(s, i, "Sync failed: ", err)
 		return
 	}

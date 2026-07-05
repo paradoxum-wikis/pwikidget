@@ -2,9 +2,11 @@ package internal
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -41,14 +43,28 @@ func (b *Bot) startAutoSync() {
 }
 
 func (b *Bot) syncAll() {
-	for _, link := range b.store.All() {
-		if err := b.syncUser(link); err != nil {
-			log.Printf("auto sync %s: %v", link.DiscordID, err)
+	links := b.store.All()
+	if len(links) == 0 {
+		return
+	}
+	aeInfo, err := b.fandom.GetWikiInfo(wikiAE)
+	if err != nil {
+		log.Printf("auto sync wiki %s: %v", wikiAE, err)
+		return
+	}
+	tdsInfo, err := b.fandom.GetWikiInfo(wikiTDS)
+	if err != nil {
+		log.Printf("auto sync wiki %s: %v", wikiTDS, err)
+		return
+	}
+	for discordID, link := range links {
+		if err := b.syncUserWithInfo(discordID, link, aeInfo, tdsInfo); err != nil {
+			log.Printf("auto sync %s: %v", discordID, err)
 		}
 	}
 }
 
-func (b *Bot) syncUser(link UserLink) error {
+func (b *Bot) syncUser(discordID string, link UserLink) error {
 	aeInfo, err := b.fandom.GetWikiInfo(wikiAE)
 	if err != nil {
 		return err
@@ -57,6 +73,10 @@ func (b *Bot) syncUser(link UserLink) error {
 	if err != nil {
 		return err
 	}
+	return b.syncUserWithInfo(discordID, link, aeInfo, tdsInfo)
+}
+
+func (b *Bot) syncUserWithInfo(discordID string, link UserLink, aeInfo, tdsInfo WikiInfo) error {
 	aeProfile, err := b.fandom.GetProfile(wikiAE, link.UserID)
 	if err != nil {
 		return err
@@ -65,7 +85,7 @@ func (b *Bot) syncUser(link UserLink) error {
 	if err != nil {
 		return err
 	}
-	return syncWidget(b.appID, b.token, link.DiscordID, link.Username, aeInfo, aeProfile, tdsInfo, tdsProfile)
+	return syncWidget(b.appID, b.token, discordID, link.Username, aeInfo, aeProfile, tdsInfo, tdsProfile)
 }
 
 func syncWidget(appID, token, discordID, username string, aeInfo WikiInfo, ae UserProfile, tdsInfo WikiInfo, tds UserProfile) error {
@@ -103,9 +123,7 @@ func syncWidget(appID, token, discordID, username string, aeInfo WikiInfo, ae Us
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		var buf bytes.Buffer
-		buf.ReadFrom(res.Body)
-		body := buf.Bytes()
+		body, _ := io.ReadAll(res.Body)
 		if res.StatusCode == 400 {
 			log.Printf("discord sync payload fields: %s", describeDynamicFields(fields))
 			log.Printf("discord sync error body: %s", body)
@@ -117,12 +135,8 @@ func syncWidget(appID, token, discordID, username string, aeInfo WikiInfo, ae Us
 
 func appendWikiFields(fields []dynamicField, prefix string, wiki WikiInfo, p UserProfile, includeShared bool) []dynamicField {
 	if includeShared {
-		display := p.DisplayName
-		if display == "" {
-			display = p.Username
-		}
 		fields = append(fields,
-			dynamicField{Type: 1, Name: prefix + "display_name", Value: display},
+			dynamicField{Type: 1, Name: prefix + "display_name", Value: cmp.Or(p.DisplayName, p.Username)},
 			dynamicField{Type: 1, Name: prefix + "wiki_username", Value: p.Username},
 		)
 		if p.Avatar != "" {
