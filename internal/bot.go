@@ -13,17 +13,17 @@ import (
 )
 
 type Bot struct {
-	appID  string
-	token  string
-	store  *Store
-	fandom *FandomClient
+	appID   string
+	token   string
+	store   *Store
+	fandom  *FandomClient
 	aphonos *AphonosClient
 }
 
 var widgetCommands = []*discordgo.ApplicationCommand{
 	{
 		Name:        "widget",
-		Description: "Alter-Ego & TDS wiki profile widget",
+		Description: "ALTER EGO & TDS wiki profile widget",
 		Options: []*discordgo.ApplicationCommandOption{
 			{
 				Type:        discordgo.ApplicationCommandOptionSubCommand,
@@ -75,67 +75,105 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 			b.handleRefresh(s, i)
 		}
 	case discordgo.InteractionMessageComponent:
-		if strings.HasPrefix(i.MessageComponentData().CustomID, "verify:") {
+		data := i.MessageComponentData()
+		switch {
+		case strings.HasPrefix(data.CustomID, "setup:continue"):
+			b.handleSetupContinue(s, i)
+		case strings.HasPrefix(data.CustomID, "verify:"):
 			b.handleVerify(s, i)
 		}
 	}
 }
 
 func (b *Bot) handleSetup(s *discordgo.Session, i *discordgo.InteractionCreate, opts []*discordgo.ApplicationCommandInteractionDataOption) {
-	uid := discordUserID(i)
-
-	link, err := b.aphonos.Lookup(uid)
-	if err != nil {
-		respond(s, i, "Failed to check Aphonos links: "+err.Error(), true)
-		return
-	}
-	if link != nil {
-		if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{Flags: discordgo.MessageFlagsEphemeral},
-		}); err != nil {
-			return
-		}
-		b.finishSetup(s, i, uid, link.FandomUsername, link.FandomUserID)
-		return
-	}
-
 	username := ""
 	for _, o := range opts {
 		if o.Name == "username" {
 			username = o.StringValue()
 		}
 	}
+	b.showSetupAck(s, i, username)
+}
+
+const setupAckMessage = "As of **June 4th**, Discord restricted profile widgets, so you must be **invited** to use this one.\n\n" +
+	"Contact <@380694434980954114> for an invite, and enable **2FA** on your Discord account before continuing."
+
+func (b *Bot) showSetupAck(s *discordgo.Session, i *discordgo.InteractionCreate, username string) {
+	customID := "setup:continue"
+	if username != "" {
+		customID = "setup:continue:" + username
+	}
+	respondComponents(s, i, setupAckMessage, []discordgo.MessageComponent{
+		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+			discordgo.Button{
+				Label:    "Continue",
+				Style:    discordgo.PrimaryButton,
+				CustomID: customID,
+			},
+		}},
+	}, true)
+}
+
+func (b *Bot) handleSetupContinue(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	customID := i.MessageComponentData().CustomID
+	username := ""
+	if parts := strings.SplitN(customID, ":", 3); len(parts) == 3 {
+		username = parts[2]
+	}
+
+	if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{Flags: discordgo.MessageFlagsEphemeral},
+	}); err != nil {
+		return
+	}
+
+	uid := discordUserID(i)
+
+	link, err := b.aphonos.Lookup(uid)
+	if err != nil {
+		followup(s, i, "Failed to check Aphonos links: "+err.Error())
+		return
+	}
+	if link != nil {
+		b.finishSetup(s, i, uid, link.FandomUsername, link.FandomUserID)
+		return
+	}
+
 	if username == "" {
-		respond(s, i, "Not linked via Aphonos. Run `/widget setup username:YourName`.", true)
+		followup(s, i, "Not linked via Aphonos. Run `/widget setup username:YourName`.")
 		return
 	}
 
 	if _, err := b.fandom.LookupUserID(wikiAE, username); err != nil {
-		respond(s, i, err.Error(), true)
+		followup(s, i, err.Error())
 		return
 	}
 
 	token := verificationToken(b.token, uid)
 	profileURL := fmt.Sprintf("https://%s.fandom.com/wiki/User:%s", wikiAE, urlPathEscape(username))
 
-	respondComponents(s, i, fmt.Sprintf(
-		"Add this to your **Alter-Ego** profile bio, then click **Verify**:\n`%s`",
-		token,
-	), []discordgo.MessageComponent{
-		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{
-				Label: "Alter-Ego Profile",
-				Style: discordgo.LinkButton,
-				URL:   profileURL,
-			},
-			discordgo.Button{
-				Label:    "Verify",
-				Style:    discordgo.PrimaryButton,
-				CustomID: fmt.Sprintf("verify:%s", username),
-			},
-		}},
-	}, true)
+	_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+		Content: fmt.Sprintf(
+			"Add this to your **ALTERPEDIA** profile bio, then click **Verify**:\n`%s`",
+			token,
+		),
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label: "ALTERPEDIA Profile",
+					Style: discordgo.LinkButton,
+					URL:   profileURL,
+				},
+				discordgo.Button{
+					Label:    "Verify",
+					Style:    discordgo.PrimaryButton,
+					CustomID: fmt.Sprintf("verify:%s", username),
+				},
+			}},
+		},
+		Flags: discordgo.MessageFlagsEphemeral,
+	})
 }
 
 func (b *Bot) handleVerify(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -168,7 +206,7 @@ func (b *Bot) handleVerify(s *discordgo.Session, i *discordgo.InteractionCreate)
 
 	expected := verificationToken(b.token, uid)
 	if !strings.Contains(profile.Bio, expected) {
-		followup(s, i, "Verification failed. Put the exact token in your Alter-Ego profile bio and try again.")
+		followup(s, i, "Verification failed. Put the exact token in your ALTERPEDIA profile bio and try again.")
 		return
 	}
 
