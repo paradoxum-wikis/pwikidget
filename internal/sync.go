@@ -151,7 +151,7 @@ func appendWikiFields(fields []dynamicField, prefix string, wiki WikiInfo, p Use
 		dynamicField{Type: 1, Name: prefix + "tags", Value: tags},
 	)
 	if includeShared && p.Bio != "" {
-		fields = append(fields, dynamicField{Type: 1, Name: prefix + "bio", Value: truncate(p.Bio, 120)})
+		fields = append(fields, dynamicField{Type: 1, Name: prefix + "bio", Value: truncate(p.Bio, 100)})
 	}
 	if wiki.Logo != "" {
 		fields = append(fields, dynamicField{
