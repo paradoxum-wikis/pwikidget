@@ -132,17 +132,19 @@ func (c *WikiClient) GetWikiInfo(w Wiki) (WikiInfo, error) {
 			Pages []struct {
 				Title     string `json:"title"`
 				ImageInfo []struct {
-					URL string `json:"url"`
+					URL      string `json:"url"`
+					ThumbURL string `json:"thumburl"`
 				} `json:"imageinfo"`
 			} `json:"pages"`
 		} `json:"query"`
 	}
 	if err := c.getJSON(c.apiURL(w, url.Values{
-		"meta":   {"siteinfo"},
-		"siprop": {"general"},
-		"titles": {"File:Site-logo.png|File:Site-favicon.ico"},
-		"prop":   {"imageinfo"},
-		"iiprop": {"url"},
+		"meta":       {"siteinfo"},
+		"siprop":     {"general"},
+		"titles":     {"File:Site-logo.png|File:Site-favicon.ico"},
+		"prop":       {"imageinfo"},
+		"iiprop":     {"url"},
+		"iiurlwidth": {"128"},
 	}), &out); err != nil {
 		return WikiInfo{}, err
 	}
@@ -152,11 +154,15 @@ func (c *WikiClient) GetWikiInfo(w Wiki) (WikiInfo, error) {
 		if len(page.ImageInfo) == 0 {
 			continue
 		}
+		u := page.ImageInfo[0].ThumbURL
+		if u == "" {
+			u = page.ImageInfo[0].URL
+		}
 		switch page.Title {
 		case "File:Site-logo.png":
-			info.Logo = page.ImageInfo[0].URL
+			info.Logo = u
 		case "File:Site-favicon.ico":
-			info.Favicon = page.ImageInfo[0].URL
+			info.Favicon = u
 		}
 	}
 	if info.Logo == "" {
