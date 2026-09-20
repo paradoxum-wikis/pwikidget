@@ -16,7 +16,7 @@ type Bot struct {
 	appID   string
 	token   string
 	store   *Store
-	fandom  *FandomClient
+	wiki    *WikiClient
 	aphonos *AphonosClient
 }
 
@@ -136,7 +136,7 @@ func (b *Bot) handleSetupContinue(s *discordgo.Session, i *discordgo.Interaction
 		return
 	}
 	if link != nil {
-		if err := b.fandom.ValidateUser(link.FandomUserID); err != nil {
+		if err := b.wiki.ValidateUser(link.FandomUsername, link.FandomUserID); err != nil {
 			followup(s, i, err.Error())
 			return
 		}
@@ -150,7 +150,7 @@ func (b *Bot) handleSetupContinue(s *discordgo.Session, i *discordgo.Interaction
 	}
 
 	token := verificationToken(b.token, uid)
-	profileURL := fmt.Sprintf("https://%s.fandom.com/wiki/User:%s", wikiAE, urlPathEscape(username))
+	profileURL := fmt.Sprintf("https://%s/wiki/User:%s", wikiAE.Domain, urlPathEscape(username))
 
 	_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 		Content: fmt.Sprintf(
@@ -191,13 +191,13 @@ func (b *Bot) handleVerify(s *discordgo.Session, i *discordgo.InteractionCreate)
 	}
 
 	uid := discordUserID(i)
-	aeID, err := b.fandom.LookupUserID(wikiAE, username)
+	aeID, err := b.wiki.LookupUserID(wikiAE, username)
 	if err != nil {
 		followup(s, i, err.Error())
 		return
 	}
 
-	profile, err := b.fandom.GetProfile(wikiAE, aeID)
+	profile, err := b.wiki.GetFandomProfile(wikiAE, aeID)
 	if err != nil {
 		followup(s, i, err.Error())
 		return
@@ -209,7 +209,7 @@ func (b *Bot) handleVerify(s *discordgo.Session, i *discordgo.InteractionCreate)
 		return
 	}
 
-	if _, err := b.fandom.GetProfile(wikiTDS, aeID); err != nil {
+	if _, err := b.wiki.GetIntegratedProfile(wikiTDS, aeID, username); err != nil {
 		followup(s, i, fmt.Errorf("tds: %w", err).Error())
 		return
 	}

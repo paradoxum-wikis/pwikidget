@@ -1,8 +1,10 @@
 package internal
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"sync"
 )
@@ -10,6 +12,21 @@ import (
 type UserLink struct {
 	Username string `json:"username"`
 	UserID   int64  `json:"user_id"`
+}
+
+func (l *UserLink) UnmarshalJSON(b []byte) error {
+	var raw struct {
+		Username  string `json:"username"`
+		UserID    int64  `json:"user_id"`
+		AEUserID  int64  `json:"ae_user_id"`
+		TDSUserID int64  `json:"tds_user_id"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	l.Username = raw.Username
+	l.UserID = cmp.Or(raw.UserID, raw.AEUserID, raw.TDSUserID)
+	return nil
 }
 
 type Store struct {
@@ -53,11 +70,7 @@ func (s *Store) Get(discordID string) (UserLink, error) {
 func (s *Store) All() map[string]UserLink {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make(map[string]UserLink, len(s.links))
-	for id, u := range s.links {
-		out[id] = u
-	}
-	return out
+	return maps.Clone(s.links)
 }
 
 func (s *Store) write() error {

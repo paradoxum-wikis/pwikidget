@@ -25,7 +25,7 @@ func Run(configPath string) error {
 		return err
 	}
 
-	fandom := newFandomClient("pwikidget/1.0 (+https://github.com/fandomwidget/pwikidget)")
+	wiki := newWikiClient("pwikidget/1.0 (+https://github.com/fandomwidget/pwikidget)")
 
 	s, err := discordgo.New("Bot " + cfg.DiscordToken)
 	if err != nil {
@@ -36,7 +36,7 @@ func Run(configPath string) error {
 		appID:   appID,
 		token:   cfg.DiscordToken,
 		store:   store,
-		fandom:  fandom,
+		wiki:    wiki,
 		aphonos: newAphonosClient(),
 	}
 

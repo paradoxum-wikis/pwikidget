@@ -47,14 +47,14 @@ func (b *Bot) syncAll() {
 	if len(links) == 0 {
 		return
 	}
-	aeInfo, err := b.fandom.GetWikiInfo(wikiAE)
+	aeInfo, err := b.wiki.GetWikiInfo(wikiAE)
 	if err != nil {
-		log.Printf("auto sync wiki %s: %v", wikiAE, err)
+		log.Printf("auto sync wiki %s: %v", wikiAE.Domain, err)
 		return
 	}
-	tdsInfo, err := b.fandom.GetWikiInfo(wikiTDS)
+	tdsInfo, err := b.wiki.GetWikiInfo(wikiTDS)
 	if err != nil {
-		log.Printf("auto sync wiki %s: %v", wikiTDS, err)
+		log.Printf("auto sync wiki %s: %v", wikiTDS.Domain, err)
 		return
 	}
 	for discordID, link := range links {
@@ -65,11 +65,11 @@ func (b *Bot) syncAll() {
 }
 
 func (b *Bot) syncUser(discordID string, link UserLink) error {
-	aeInfo, err := b.fandom.GetWikiInfo(wikiAE)
+	aeInfo, err := b.wiki.GetWikiInfo(wikiAE)
 	if err != nil {
 		return err
 	}
-	tdsInfo, err := b.fandom.GetWikiInfo(wikiTDS)
+	tdsInfo, err := b.wiki.GetWikiInfo(wikiTDS)
 	if err != nil {
 		return err
 	}
@@ -77,15 +77,15 @@ func (b *Bot) syncUser(discordID string, link UserLink) error {
 }
 
 func (b *Bot) syncUserWithInfo(discordID string, link UserLink, aeInfo, tdsInfo WikiInfo) error {
-	aeProfile, err := b.fandom.GetProfile(wikiAE, link.UserID)
+	aeProfile, err := b.wiki.GetFandomProfile(wikiAE, link.UserID)
 	if err != nil {
 		return err
 	}
-	tdsProfile, err := b.fandom.GetProfile(wikiTDS, link.UserID)
+	tdsProfile, err := b.wiki.GetIntegratedProfile(wikiTDS, link.UserID, link.Username)
 	if err != nil {
 		return err
 	}
-	return syncWidget(b.appID, b.token, discordID, link.Username, aeInfo, aeProfile, tdsInfo, tdsProfile)
+	return syncWidget(b.appID, b.token, discordID, tdsProfile.Username, aeInfo, aeProfile, tdsInfo, tdsProfile)
 }
 
 func syncWidget(appID, token, discordID, username string, aeInfo WikiInfo, ae UserProfile, tdsInfo WikiInfo, tds UserProfile) error {
@@ -154,7 +154,7 @@ func appendWikiFields(fields []dynamicField, prefix string, wiki WikiInfo, p Use
 	}
 
 	fields = append(fields,
-		dynamicField{Type: 1, Name: prefix + "wiki", Value: "@" + wiki.Subdomain},
+		dynamicField{Type: 1, Name: prefix + "wiki", Value: "@" + wiki.Handle},
 		dynamicField{Type: 1, Name: prefix + "wiki_name", Value: wiki.Name},
 		dynamicField{Type: 1, Name: prefix + "edits", Value: formatWithCommas(p.LocalEdits)},
 		dynamicField{Type: 2, Name: prefix + "edit_count", Value: p.LocalEdits},
@@ -188,7 +188,7 @@ func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return s[:n-1] + "…"
+	return s[:n-1] + "..."
 }
 
 func webpURL(u string) string {
